@@ -18,7 +18,7 @@ open class CodableHelper {
         let decoder = JSONDecoder()
         decoder.dataDecodingStrategy = .base64Decode
         if #available(iOS 10.0, *) {
-            decoder.dateDecodingStrategy = .iso8601
+            decoder.dateDecodingStrategy = .formatted(Configuration.dateFormatter)
         }
 
         do {
@@ -40,7 +40,7 @@ open class CodableHelper {
         }
         encoder.dataEncodingStrategy = .base64Encode
         if #available(iOS 10.0, *) {
-            encoder.dateEncodingStrategy = .iso8601
+            encoder.dateEncodingStrategy = .formatted(Configuration.dateFormatter)
         }
 
         do {
