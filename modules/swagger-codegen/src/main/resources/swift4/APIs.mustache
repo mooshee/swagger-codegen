@@ -24,6 +24,9 @@ open class RequestBuilder<T> {
     /// Optional block to obtain a reference to the request's progress instance when available.
     public var onProgressReady: ((Progress) -> ())?
 
+    internal(set) var isCancelled: Bool = false
+    open func cancel() { isCancelled = true }
+    
     required public init(method: String, URLString: String, parameters: [String:Any]?, isBody: Bool, headers: [String:String] = [:]) {
         self.method = method
         self.URLString = URLString
