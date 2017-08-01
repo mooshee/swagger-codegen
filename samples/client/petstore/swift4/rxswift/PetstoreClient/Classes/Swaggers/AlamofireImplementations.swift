@@ -54,6 +54,15 @@ open class AlamofireRequestBuilder<T>: RequestBuilder<T> {
         return manager.request(URLString, method: method, parameters: parameters, encoding: encoding, headers: headers)
     }
 
+    override open func cancel() {
+        super.cancel()
+        
+        for store in managerStore.enumerated() {
+            store.element.value.session.invalidateAndCancel()
+        }
+        managerStore.removeAll()
+    }
+
     override open func execute(_ completion: @escaping (_ response: Response<T>?, _ error: Error?) -> Void) {
         let managerId:String = UUID().uuidString
         // Create a new manager for each request to customize its request header
@@ -198,6 +207,7 @@ public enum AlamofireDecodableRequestBuilderError: Error {
     case nilHTTPResponse
     case jsonDecoding(DecodingError)
     case generalError(Error)
+    case userCancelled
 }
 
 open class AlamofireDecodableRequestBuilder<T:Decodable>: AlamofireRequestBuilder<T> {
@@ -289,6 +299,11 @@ open class AlamofireDecodableRequestBuilder<T:Decodable>: AlamofireRequestBuilde
 
                 guard let httpResponse = dataResponse.response else {
                     completion(nil, ErrorResponse.Error(-2, nil, AlamofireDecodableRequestBuilderError.nilHTTPResponse))
+                    return
+                }
+
+                guard !self.isCancelled else {
+                    completion(nil, ErrorResponse.Error(-3, nil, AlamofireDecodableRequestBuilderError.userCancelled))
                     return
                 }
 
