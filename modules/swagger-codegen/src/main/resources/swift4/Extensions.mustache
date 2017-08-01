@@ -6,7 +6,8 @@
 
 import Foundation
 import Alamofire{{#usePromiseKit}}
-import PromiseKit{{/usePromiseKit}}
+import PromiseKit{{/usePromiseKit}}{{#useCoreData}}
+import CoreData{{/useCoreData}}
 
 extension Bool: JSONEncodable {
     func encodeToJSON() -> Any { return self as Any }
@@ -83,9 +84,30 @@ extension UUID: JSONEncodable {
     func encodeToJSON() -> Any {
         return self.uuidString
     }
+}{{#useCoreData}}
+
+extension NSManagedObject {
+    
+    func getManagedValue(key: String) -> Any? {
+        willAccessValue(forKey: key)
+        defer { didAccessValue(forKey: key) }
+        return primitiveValue(forKey: key)
+    }
+    
+    func setManagedValue(_ newValue: Any?, key: String) {
+        willChangeValue(forKey: key)
+        setPrimitiveValue(newValue, forKey: key)
+        didChangeValue(forKey: key)
+    }
 }
 
-{{#usePromiseKit}}extension RequestBuilder {
+extension Array where Element: Hashable {
+    func toSet() -> Set<Element> {
+        return Set(self)
+    }
+}{{/useCoreData}}{{#usePromiseKit}}
+
+extension RequestBuilder {
     public func execute() -> Promise<Response<T>>  {
         let deferred = Promise<Response<T>>.pending()
         self.execute { (response: Response<T>?, error: Error?) in

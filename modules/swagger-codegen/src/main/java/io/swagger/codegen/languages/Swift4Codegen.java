@@ -40,6 +40,7 @@ public class Swift4Codegen extends DefaultCodegen implements CodegenConfig {
     public static final String SWIFT_USE_API_NAMESPACE = "swiftUseApiNamespace";
     public static final String DEFAULT_POD_AUTHORS = "Swagger Codegen";
     public static final String LENIENT_TYPE_CAST = "lenientTypeCast";
+    public static final String USE_CORE_DATA = "useCoreData";
     protected static final String LIBRARY_PROMISE_KIT = "PromiseKit";
     protected static final String LIBRARY_RX_SWIFT = "RxSwift";
     protected static final String[] RESPONSE_LIBRARIES = {LIBRARY_PROMISE_KIT, LIBRARY_RX_SWIFT};
@@ -49,6 +50,7 @@ public class Swift4Codegen extends DefaultCodegen implements CodegenConfig {
     protected boolean swiftUseApiNamespace;
     protected String[] responseAs = new String[0];
     protected String sourceFolder = "Classes" + File.separator + "Swaggers";
+    protected boolean useCoreData = false;
 
     @Override
     public CodegenType getTag() {
@@ -70,7 +72,7 @@ public class Swift4Codegen extends DefaultCodegen implements CodegenConfig {
 
         final Property additionalProperties = swaggerModel.getAdditionalProperties();
 
-        if(additionalProperties != null) {
+        if (additionalProperties != null) {
             codegenModel.additionalPropertiesType = getSwaggerType(additionalProperties);
         }
     }
@@ -135,6 +137,7 @@ public class Swift4Codegen extends DefaultCodegen implements CodegenConfig {
         typeMapping.put("date", "Date");
         typeMapping.put("Date", "Date");
         typeMapping.put("DateTime", "Date");
+        typeMapping.put("date-time", "Date");
         typeMapping.put("boolean", "Bool");
         typeMapping.put("string", "String");
         typeMapping.put("char", "Character");
@@ -159,6 +162,7 @@ public class Swift4Codegen extends DefaultCodegen implements CodegenConfig {
                 StringUtils.join(RESPONSE_LIBRARIES, ", ") + " are available."));
         cliOptions.add(new CliOption(UNWRAP_REQUIRED, "Treat 'required' properties in response as non-optional " +
                 "(which would crash the app if api returns null as opposed to required option specified in json schema"));
+        cliOptions.add(new CliOption(USE_CORE_DATA, "Flag to create Core Data objects and mappings"));
         cliOptions.add(new CliOption(POD_SOURCE, "Source information used for Podspec"));
         cliOptions.add(new CliOption(CodegenConstants.POD_VERSION, "Version used for Podspec"));
         cliOptions.add(new CliOption(POD_AUTHORS, "Authors used for Podspec"));
@@ -203,6 +207,12 @@ public class Swift4Codegen extends DefaultCodegen implements CodegenConfig {
         }
         additionalProperties.put(UNWRAP_REQUIRED, unwrapRequired);
 
+        // Setup Core Data model generators
+        if (additionalProperties.containsKey(USE_CORE_DATA)) {
+            setUseCoreData(convertPropertyToBooleanAndWriteBack(USE_CORE_DATA));
+        }
+        additionalProperties.put(USE_CORE_DATA, useCoreData);
+
         // Setup unwrapRequired option, which makes all the properties with "required" non-optional
         if (additionalProperties.containsKey(RESPONSE_AS)) {
             Object responseAsObject = additionalProperties.get(RESPONSE_AS);
@@ -246,6 +256,12 @@ public class Swift4Codegen extends DefaultCodegen implements CodegenConfig {
         supportingFiles.add(new SupportingFile("git_push.sh.mustache", "", "git_push.sh"));
         supportingFiles.add(new SupportingFile("gitignore.mustache", "", ".gitignore"));
 
+        if (useCoreData) {
+            supportingFiles.add(new SupportingFile("xccurrentversion.mustache",  sourceFolder + File.separator + "Model.xcdatamodeld", ".xccurrentversion"));
+            supportingFiles.add(new SupportingFile("Model.xcdatamodel.mustache", sourceFolder + File.separator + "Model.xcdatamodeld" + File.separator + "Model.xcdatamodel", "contents"));
+            modelTemplateFiles.put("ManagedObject.mustache", "ManagedObject.swift");
+            modelTemplateFiles.put("ManagedObject+CoreDataProperties.mustache", "ManagedObject+CoreDataProperties.swift");
+        }
     }
 
     @Override
@@ -255,7 +271,7 @@ public class Swift4Codegen extends DefaultCodegen implements CodegenConfig {
 
     @Override
     public String escapeReservedWord(String name) {
-        if(this.reservedWordsMappings().containsKey(name)) {
+        if (this.reservedWordsMappings().containsKey(name)) {
             return this.reservedWordsMappings().get(name);
         }
         return "_" + name;  // add an underscore to the name
@@ -381,8 +397,9 @@ public class Swift4Codegen extends DefaultCodegen implements CodegenConfig {
 
     @Override
     public String toApiName(String name) {
-        if (name.length() == 0)
+        if (name.length() == 0) {
             return "DefaultAPI";
+        }
         return initialCaps(name) + "API";
     }
 
@@ -455,21 +472,21 @@ public class Swift4Codegen extends DefaultCodegen implements CodegenConfig {
     @Override
     public CodegenModel fromModel(String name, Model model, Map<String, Model> allDefinitions) {
         CodegenModel codegenModel = super.fromModel(name, model, allDefinitions);
-        if(codegenModel.description != null) {
+        if (codegenModel.description != null) {
             codegenModel.imports.add("ApiModel");
         }
         if (allDefinitions != null) {
-          String parentSchema = codegenModel.parentSchema;
+            String parentSchema = codegenModel.parentSchema;
 
-          // multilevel inheritance: reconcile properties of all the parents
-          while (parentSchema != null) {
-            final Model parentModel = allDefinitions.get(parentSchema);
-            final CodegenModel parentCodegenModel = super.fromModel(codegenModel.parent, parentModel, allDefinitions);
-            codegenModel = Swift4Codegen.reconcileProperties(codegenModel, parentCodegenModel);
+            // multilevel inheritance: reconcile properties of all the parents
+            while (parentSchema != null) {
+                final Model parentModel = allDefinitions.get(parentSchema);
+                final CodegenModel parentCodegenModel = super.fromModel(codegenModel.parent, parentModel, allDefinitions);
+                codegenModel = Swift4Codegen.reconcileProperties(codegenModel, parentCodegenModel);
 
-            // get the next parent
-            parentSchema = parentCodegenModel.parentSchema;
-          }
+                // get the next parent
+                parentSchema = parentCodegenModel.parentSchema;
+            }
         }
 
         return codegenModel;
@@ -481,6 +498,10 @@ public class Swift4Codegen extends DefaultCodegen implements CodegenConfig {
 
     public void setUnwrapRequired(boolean unwrapRequired) {
         this.unwrapRequired = unwrapRequired;
+    }
+
+    public void setUseCoreData(boolean useCoreData) {
+        this.useCoreData = useCoreData;
     }
 
     public void setLenientTypeCast(boolean lenientTypeCast) {
@@ -624,7 +645,7 @@ public class Swift4Codegen extends DefaultCodegen implements CodegenConfig {
           }
         }
 
-        if(removedChildProperty) {
+        if (removedChildProperty) {
             // If we removed an entry from this model's vars, we need to ensure hasMore is updated
             int count = 0, numVars = codegenProperties.size();
             for(CodegenProperty codegenProperty : codegenProperties) {
